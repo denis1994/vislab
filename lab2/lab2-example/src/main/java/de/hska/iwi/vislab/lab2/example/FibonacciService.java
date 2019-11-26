@@ -11,23 +11,23 @@ public class FibonacciService {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public String getFibonacci() {
-        String outJson = "{\"n\": " + this.fibonacciNumber + ", \"fibonacci\": " + this.fibonacci + "}";
+        String outJson = "{\"n\": " + FibonacciService.fibonacciNumber + ", \"fibonacci\": " + FibonacciService.fibonacci + "}";
         return outJson;
     }
 
     @PUT
     @Produces(MediaType.TEXT_PLAIN)
     public String calcNextFibonacci() {
-        this.fibonacciNumber++;
-        this.fibonacci = this.fib(this.fibonacciNumber);
+        FibonacciService.fibonacciNumber++;
+        FibonacciService.fibonacci = this.fib(FibonacciService.fibonacciNumber);
         return "success";
     }
 
     @DELETE
     @Produces(MediaType.TEXT_PLAIN)
     public String restoreState() {
-        this.fibonacciNumber = 0;
-        this.fibonacci = 0;
+        FibonacciService.fibonacciNumber = 0;
+        FibonacciService.fibonacci = 0;
         return "success";
     }
 
