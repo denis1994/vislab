@@ -1,7 +1,6 @@
 package de.hska.iwi.vislab.lab2.example;
 
 import org.glassfish.grizzly.http.server.HttpServer;
-import org.glassfish.jersey.client.ClientProperties;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
