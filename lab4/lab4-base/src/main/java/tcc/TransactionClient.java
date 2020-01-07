@@ -18,6 +18,8 @@ import tcc.hotel.HotelReservationDoc;
  * with some requests.
  */
 public class TransactionClient {
+	public static int MAX_RETRIES = 3;
+
 	public static void main(String[] args) {
 		try {
 			Client client = ClientBuilder.newClient();
@@ -41,49 +43,34 @@ public class TransactionClient {
 			docHotel.setHotel("Hilton");
 			docHotel.setDate(tomorrow.getTimeInMillis());
 
-			boolean reservationCompleted = false;
-			int retryCounter = 0;
-
-			while (!reservationCompleted || retryCounter <= 3) {
-				retryCounter++;
-
+			// reserving flight & hotel
+			try {
+				// reserve flight
 				FlightReservationDoc responseFlight = reserveFlight(target, docFlight);
-				// book hotel
 
-				WebTarget webTargetHotel = target.path("hotel");
+				// reserve hotel
+				HotelReservationDoc responseHotel = reserveHotel(target, docHotel);
 
-				Response responseHotel = webTargetHotel.request().accept(MediaType.APPLICATION_XML)
-						.post(Entity.xml(docHotel));
+				try {
+					// confirming flight
+					confirmFlight(target, responseFlight.getUrl());
 
-				if (responseHotel.getStatus() != 200) {
-					System.out.println("Failed : HTTP error code : " + responseHotel.getStatus());
-				}
+					// confirming hotel
+					confirmHotel(target, responseHotel.getUrl());
+				} catch (Exception e) {
+					System.out.println(e);
 
-				HotelReservationDoc outputHotel = responseHotel.readEntity(HotelReservationDoc.class);
-				System.out.println("Output from Server: " + outputHotel);
-
-				if (responseFlight.getStatus() == 200 && responseHotel.getStatus() == 200) {
-					// flight
-					String flightId = outputFlight.getUrl().substring(outputFlight.getUrl().lastIndexOf("/") + 1);
-					WebTarget flightConfirm = target.path("flight/" + flightId);
-					Response flightConfirmResponse = flightConfirm.request().accept(MediaType.TEXT_PLAIN)
-							.put(Entity.xml(""));
-
-					// hotel
-					String hotelId = outputHotel.getUrl().substring(outputHotel.getUrl().lastIndexOf("/") + 1);
-					WebTarget hotelConfirm = target.path("hotel/" + hotelId);
-					Response hotelConfirmResponse = hotelConfirm.request().accept(MediaType.TEXT_PLAIN)
-							.put(Entity.xml(""));
-
-					// either hotel or flight not confirmed
-					if (flightConfirmResponse.getStatus() != 200 || hotelConfirmResponse.getStatus() != 200) {
-						// rollback both transactions
-						flightConfirm.request().accept(MediaType.TEXT_PLAIN).delete();
-						hotelConfirm.request().accept(MediaType.TEXT_PLAIN).delete();
-
-						System.out.println("Rollback");
+					try {
+						// something went wrong, rollback transactions
+						rollbackFlightConfirmation(target, responseFlight.getUrl());
+						rollbackHotelConfirmation(target, responseHotel.getUrl());
+					} catch (Exception e2) {
+						System.out.println(e2);
 					}
+
 				}
+			} catch (Exception e) {
+				System.out.println(e);
 			}
 
 		} catch (Exception e) {
@@ -91,11 +78,11 @@ public class TransactionClient {
 		}
 	}
 
-	private static FlightReservationDoc reserveFlight(WebTarget target, FlightReservationDoc docFlight) {
-		boolean reservationCompleted = false;
+	private static FlightReservationDoc reserveFlight(WebTarget target, FlightReservationDoc docFlight)
+			throws Exception {
 		int retryCounter = 0;
 
-		while (!reservationCompleted || retryCounter <= 3) {
+		while (retryCounter <= MAX_RETRIES) {
 			retryCounter++;
 
 			WebTarget webTargetFlight = target.path("flight");
@@ -106,9 +93,103 @@ public class TransactionClient {
 			if (responseFlight.getStatus() == 200) {
 				return responseFlight.readEntity(FlightReservationDoc.class);
 			}
-
 		}
 
-		throw new RuntimeException();
+		throw new Exception("Reserving flight not possible!");
+	}
+
+	private static HotelReservationDoc reserveHotel(WebTarget target, HotelReservationDoc docHotel) throws Exception {
+		int retryCounter = 0;
+
+		while (retryCounter <= MAX_RETRIES) {
+			retryCounter++;
+
+			WebTarget webTargetHotel = target.path("hotel");
+
+			Response responseHotel = webTargetHotel.request().accept(MediaType.APPLICATION_XML)
+					.post(Entity.xml(docHotel));
+
+			if (responseHotel.getStatus() == 200) {
+				return responseHotel.readEntity(HotelReservationDoc.class);
+			}
+		}
+
+		throw new Exception("Reserving hotel not possible!");
+	}
+
+	private static boolean confirmFlight(WebTarget target, String flightConfirmationUrl) throws Exception {
+		int retryCounter = 0;
+
+		while (retryCounter <= MAX_RETRIES) {
+			retryCounter++;
+
+			String flightConfirmationId = flightConfirmationUrl.substring(flightConfirmationUrl.lastIndexOf("/") + 1);
+			WebTarget flightConfirmationTarget = target.path("flight/" + flightConfirmationId);
+			Response flightConfirmationResponse = flightConfirmationTarget.request().accept(MediaType.TEXT_PLAIN)
+					.put(Entity.xml(""));
+
+			if (flightConfirmationResponse.getStatus() == 200) {
+				return true;
+			}
+		}
+
+		throw new Exception("Confirming flight not possible!");
+	}
+
+	private static boolean confirmHotel(WebTarget target, String hotelConfirmationUrl) throws Exception {
+		int retryCounter = 0;
+
+		while (retryCounter <= MAX_RETRIES) {
+			retryCounter++;
+
+			String hotelConfirmationId = hotelConfirmationUrl.substring(hotelConfirmationUrl.lastIndexOf("/") + 1);
+			WebTarget hotelConfirmationTarget = target.path("hotel/" + hotelConfirmationId);
+			Response hotelConfirmationResponse = hotelConfirmationTarget.request().accept(MediaType.TEXT_PLAIN)
+					.put(Entity.xml(""));
+
+			if (hotelConfirmationResponse.getStatus() == 200) {
+				return true;
+			}
+		}
+
+		throw new Exception("Confirming hotel not possible!");
+	}
+
+	private static boolean rollbackFlightConfirmation(WebTarget target, String flightConfirmationUrl) throws Exception {
+		int retryCounter = 0;
+
+		while (retryCounter <= MAX_RETRIES) {
+			retryCounter++;
+
+			String flightConfirmationId = flightConfirmationUrl.substring(flightConfirmationUrl.lastIndexOf("/") + 1);
+			WebTarget flightConfirmationTarget = target.path("flight/" + flightConfirmationId);
+			Response flightConfirmationResponse = flightConfirmationTarget.request().accept(MediaType.TEXT_PLAIN)
+					.delete();
+
+			if (flightConfirmationResponse.getStatus() == 200) {
+				return true;
+			}
+		}
+
+		throw new Exception("Rollbacking flight confirmation not possible!");
+	}
+
+	private static boolean rollbackHotelConfirmation(WebTarget target, String hotelConfirmationUrl) throws Exception {
+		int retryCounter = 0;
+
+		while (retryCounter <= MAX_RETRIES) {
+			retryCounter++;
+
+			String hotelConfirmationId = hotelConfirmationUrl.substring(hotelConfirmationUrl.lastIndexOf("/") + 1);
+			WebTarget hotelConfirmationTarget = target.path("hotel/" + hotelConfirmationId);
+			Response hotelConfirmationResponse = hotelConfirmationTarget.request().accept(MediaType.TEXT_PLAIN)
+					.delete();
+
+			if (hotelConfirmationResponse.getStatus() == 200) {
+				return true;
+			}
+		}
+
+		throw new Exception("Rollbacking hotel confirmation not possible!");
 	}
 }
