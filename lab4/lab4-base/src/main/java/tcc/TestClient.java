@@ -19,56 +19,58 @@ import tcc.hotel.HotelReservationDoc;
  */
 public class TestClient {
 	public static void main(String[] args) {
-		try {
-			Client client = ClientBuilder.newClient();
-			WebTarget target = client.target(TestServer.BASE_URI);
+		for (int i = 0; i < 8; i++) {
+			try {
+				Client client = ClientBuilder.newClient();
+				WebTarget target = client.target(TestServer.BASE_URI);
 
-			GregorianCalendar tomorrow = new GregorianCalendar();
-			tomorrow.setTime(new Date());
-			tomorrow.add(GregorianCalendar.DAY_OF_YEAR, 1);
+				GregorianCalendar tomorrow = new GregorianCalendar();
+				tomorrow.setTime(new Date());
+				tomorrow.add(GregorianCalendar.DAY_OF_YEAR, 1);
 
-			// book flight
+				// book flight
 
-			WebTarget webTargetFlight = target.path("flight");
+				WebTarget webTargetFlight = target.path("flight");
 
-			FlightReservationDoc docFlight = new FlightReservationDoc();
-			docFlight.setName("Christian");
-			docFlight.setFrom("Karlsruhe");
-			docFlight.setTo("Berlin");
-			docFlight.setAirline("airberlin");
-			docFlight.setDate(tomorrow.getTimeInMillis());
+				FlightReservationDoc docFlight = new FlightReservationDoc();
+				docFlight.setName("Denis, Yannick, Pol");
+				docFlight.setFrom("Karlsruhe");
+				docFlight.setTo("Mallorca");
+				docFlight.setAirline("airpalma");
+				docFlight.setDate(tomorrow.getTimeInMillis());
 
-			Response responseFlight = webTargetFlight.request().accept(MediaType.APPLICATION_XML)
-					.post(Entity.xml(docFlight));
+				Response responseFlight = webTargetFlight.request().accept(MediaType.APPLICATION_XML)
+						.post(Entity.xml(docFlight));
 
-			if (responseFlight.getStatus() != 200) {
-				System.out.println("Failed : HTTP error code : " + responseFlight.getStatus());
+				if (responseFlight.getStatus() != 200) {
+					System.out.println("Failed : HTTP error code : " + responseFlight.getStatus());
+				}
+
+				FlightReservationDoc outputFlight = responseFlight.readEntity(FlightReservationDoc.class);
+				System.out.println("Output from Server: " + outputFlight);
+
+				// book hotel
+
+				WebTarget webTargetHotel = target.path("hotel");
+
+				HotelReservationDoc docHotel = new HotelReservationDoc();
+				docHotel.setName("Denis, Yannick, Pol");
+				docHotel.setHotel("Hilton");
+				docHotel.setDate(tomorrow.getTimeInMillis());
+
+				Response responseHotel = webTargetHotel.request().accept(MediaType.APPLICATION_XML)
+						.post(Entity.xml(docHotel));
+
+				if (responseHotel.getStatus() != 200) {
+					System.out.println("Failed : HTTP error code : " + responseHotel.getStatus());
+				}
+
+				HotelReservationDoc outputHotel = responseHotel.readEntity(HotelReservationDoc.class);
+				System.out.println("Output from Server: " + outputHotel);
+
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
-
-			FlightReservationDoc outputFlight = responseFlight.readEntity(FlightReservationDoc.class);
-			System.out.println("Output from Server: " + outputFlight);
-
-			// book hotel
-
-			WebTarget webTargetHotel = target.path("hotel");
-
-			HotelReservationDoc docHotel = new HotelReservationDoc();
-			docHotel.setName("Christian");
-			docHotel.setHotel("Interconti");
-			docHotel.setDate(tomorrow.getTimeInMillis());
-
-			Response responseHotel = webTargetHotel.request().accept(MediaType.APPLICATION_XML)
-					.post(Entity.xml(docHotel));
-
-			if (responseHotel.getStatus() != 200) {
-				System.out.println("Failed : HTTP error code : " + responseHotel.getStatus());
-			}
-
-			HotelReservationDoc outputHotel = responseHotel.readEntity(HotelReservationDoc.class);
-			System.out.println("Output from Server: " + outputHotel);
-
-		} catch (Exception e) {
-			e.printStackTrace();
 		}
 	}
 }

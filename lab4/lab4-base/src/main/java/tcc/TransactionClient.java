@@ -55,8 +55,12 @@ public class TransactionClient {
 					// confirming flight
 					confirmFlight(target, responseFlight.getUrl());
 
-					// confirming hotel
-					confirmHotel(target, responseHotel.getUrl());
+					try {
+						// confirming hotel
+						confirmHotel(target, responseHotel.getUrl());
+					} catch (Exception e3) {
+						System.out.println("Send Email");
+					}
 				} catch (Exception e) {
 					System.out.println(e);
 
@@ -139,7 +143,7 @@ public class TransactionClient {
 	private static boolean confirmHotel(WebTarget target, String hotelConfirmationUrl) throws Exception {
 		int retryCounter = 0;
 
-		while (retryCounter <= MAX_RETRIES) {
+		while (retryCounter <= 10) {
 			retryCounter++;
 
 			String hotelConfirmationId = hotelConfirmationUrl.substring(hotelConfirmationUrl.lastIndexOf("/") + 1);
